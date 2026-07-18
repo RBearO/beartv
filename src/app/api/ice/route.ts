@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { parseStunServers } from "@/lib/utils";
+import { createOpenRelayIceServers } from "@/lib/turn";
 
 /**
  * Authenticated ICE server config.
  * STUN URLs are public; TURN credentials stay server-side.
  *
- * Supported TURN sources (first match wins for TURN entries):
- * 1. Static TURN_* / NEXT_PUBLIC_TURN_* env vars
- * 2. Metered / Open Relay REST: METERED_DOMAIN + METERED_TURN_API_KEY
- *    (fetches short-lived iceServers from their credentials API)
+ * Priority:
+ * 1. Static TURN_* env vars
+ * 2. Metered REST (METERED_DOMAIN + METERED_TURN_API_KEY)
+ * 3. Open Relay free static-auth (default — short-lived HMAC credentials)
  */
 export async function GET() {
   const session = await auth();
@@ -22,6 +23,7 @@ export async function GET() {
   );
 
   let turnConfigured = false;
+  let turnSource: "static" | "metered" | "openrelay" | "none" = "none";
 
   const turnUrls = [
     process.env.TURN_URL || process.env.NEXT_PUBLIC_TURN_URL,
@@ -42,12 +44,16 @@ export async function GET() {
       credential: turnPass,
     });
     turnConfigured = true;
+    turnSource = "static";
   } else {
     const meteredDomain = (
       process.env.METERED_DOMAIN ||
       process.env.METERED_TURN_DOMAIN ||
       ""
-    ).trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+    )
+      .trim()
+      .replace(/^https?:\/\//, "")
+      .replace(/\/$/, "");
     const meteredApiKey = (
       process.env.METERED_TURN_API_KEY ||
       process.env.METERED_API_KEY ||
@@ -59,7 +65,9 @@ export async function GET() {
         const url = `https://${meteredDomain}/api/v1/turn/credentials?apiKey=${encodeURIComponent(meteredApiKey)}`;
         const res = await fetch(url, { cache: "no-store" });
         if (res.ok) {
-          const data = (await res.json()) as RTCIceServer[] | { iceServers?: RTCIceServer[] };
+          const data = (await res.json()) as
+            | RTCIceServer[]
+            | { iceServers?: RTCIceServer[] };
           const servers = Array.isArray(data)
             ? data
             : Array.isArray(data.iceServers)
@@ -70,8 +78,11 @@ export async function GET() {
           }
           turnConfigured = servers.some((s) => {
             const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
-            return urls.some((u) => typeof u === "string" && u.startsWith("turn"));
+            return urls.some(
+              (u) => typeof u === "string" && u.startsWith("turn")
+            );
           });
+          if (turnConfigured) turnSource = "metered";
         } else {
           console.error("[ICE] Metered credentials fetch failed:", res.status);
         }
@@ -79,10 +90,18 @@ export async function GET() {
         console.error("[ICE] Metered credentials error:", err);
       }
     }
+
+    if (!turnConfigured) {
+      const openRelay = createOpenRelayIceServers(session.user.id);
+      iceServers.push(...openRelay);
+      turnConfigured = true;
+      turnSource = "openrelay";
+    }
   }
 
   return NextResponse.json({
     iceServers,
     turnConfigured,
+    turnSource,
   });
 }
