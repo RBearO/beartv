@@ -4,7 +4,12 @@ import { parseStunServers } from "@/lib/utils";
 
 /**
  * Authenticated ICE server config.
- * STUN URLs are public; TURN credentials stay server-side when TURN_USERNAME/TURN_PASSWORD are set.
+ * STUN URLs are public; TURN credentials stay server-side.
+ *
+ * Supported TURN sources (first match wins for TURN entries):
+ * 1. Static TURN_* / NEXT_PUBLIC_TURN_* env vars
+ * 2. Metered / Open Relay REST: METERED_DOMAIN + METERED_TURN_API_KEY
+ *    (fetches short-lived iceServers from their credentials API)
  */
 export async function GET() {
   const session = await auth();
@@ -15,6 +20,8 @@ export async function GET() {
   const iceServers: RTCIceServer[] = parseStunServers(
     process.env.NEXT_PUBLIC_STUN_SERVERS || process.env.NEXT_PUBLIC_STUN_URL
   );
+
+  let turnConfigured = false;
 
   const turnUrls = [
     process.env.TURN_URL || process.env.NEXT_PUBLIC_TURN_URL,
@@ -34,10 +41,48 @@ export async function GET() {
       username: turnUser,
       credential: turnPass,
     });
+    turnConfigured = true;
+  } else {
+    const meteredDomain = (
+      process.env.METERED_DOMAIN ||
+      process.env.METERED_TURN_DOMAIN ||
+      ""
+    ).trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const meteredApiKey = (
+      process.env.METERED_TURN_API_KEY ||
+      process.env.METERED_API_KEY ||
+      ""
+    ).trim();
+
+    if (meteredDomain && meteredApiKey) {
+      try {
+        const url = `https://${meteredDomain}/api/v1/turn/credentials?apiKey=${encodeURIComponent(meteredApiKey)}`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (res.ok) {
+          const data = (await res.json()) as RTCIceServer[] | { iceServers?: RTCIceServer[] };
+          const servers = Array.isArray(data)
+            ? data
+            : Array.isArray(data.iceServers)
+              ? data.iceServers
+              : [];
+          for (const server of servers) {
+            if (server?.urls) iceServers.push(server);
+          }
+          turnConfigured = servers.some((s) => {
+            const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+            return urls.some((u) => typeof u === "string" && u.startsWith("turn"));
+          });
+        } else {
+          console.error("[ICE] Metered credentials fetch failed:", res.status);
+        }
+      } catch (err) {
+        console.error("[ICE] Metered credentials error:", err);
+      }
+    }
   }
 
   return NextResponse.json({
     iceServers,
-    turnConfigured: Boolean(turnUrls.length && turnUser && turnPass),
+    turnConfigured,
   });
 }

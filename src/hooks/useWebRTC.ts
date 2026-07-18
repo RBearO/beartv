@@ -3,19 +3,21 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { fetchIceServers } from "@/lib/utils";
 
+type SignalType = "offer" | "answer" | "ice-candidate";
+
+interface IncomingSignal {
+  type: SignalType;
+  payload: RTCSessionDescriptionInit | RTCIceCandidateInit;
+  fromId: string;
+}
+
 interface UseWebRTCOptions {
   onSignal: (signal: {
-    type: "offer" | "answer" | "ice-candidate";
+    type: SignalType;
     payload: RTCSessionDescriptionInit | RTCIceCandidateInit;
     targetId: string;
   }) => void;
-  onSignalReceived: (
-    handler: (signal: {
-      type: "offer" | "answer" | "ice-candidate";
-      payload: RTCSessionDescriptionInit | RTCIceCandidateInit;
-      fromId: string;
-    }) => void
-  ) => () => void;
+  onSignalReceived: (handler: (signal: IncomingSignal) => void) => () => void;
   localStream: MediaStream | null;
   peerId: string | null;
   isInitiator: boolean;
@@ -33,12 +35,17 @@ export function useWebRTC({
   sessionId,
 }: UseWebRTCOptions) {
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef(localStream);
   const sessionIdRef = useRef(sessionId);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [connectionState, setConnectionState] =
     useState<RTCPeerConnectionState>("new");
 
   sessionIdRef.current = sessionId;
+  localStreamRef.current = localStream;
+
+  // Restart PC when media first becomes available (device switches use replaceTrack).
+  const hasLocalMedia = Boolean(localStream);
 
   const cleanup = useCallback(() => {
     const pc = pcRef.current;
@@ -54,7 +61,7 @@ export function useWebRTC({
   }, []);
 
   useEffect(() => {
-    if (!enabled || !peerId || !localStream) {
+    if (!enabled || !peerId) {
       cleanup();
       return;
     }
@@ -64,7 +71,9 @@ export function useWebRTC({
     let unsubscribe: (() => void) | undefined;
     let pc: RTCPeerConnection | null = null;
     const pendingCandidates: RTCIceCandidateInit[] = [];
+    const earlySignals: IncomingSignal[] = [];
     let remoteDescriptionSet = false;
+    let pcReady = false;
 
     const flushCandidates = async (connection: RTCPeerConnection) => {
       while (pendingCandidates.length > 0) {
@@ -78,6 +87,68 @@ export function useWebRTC({
       }
     };
 
+    const attachLocalMedia = (connection: RTCPeerConnection) => {
+      const stream = localStreamRef.current;
+      if (stream && stream.getTracks().length > 0) {
+        stream.getTracks().forEach((track) => {
+          connection.addTrack(track, stream);
+        });
+        return;
+      }
+      // Allow receiving even if this peer has no camera/mic yet.
+      connection.addTransceiver("audio", { direction: "recvonly" });
+      connection.addTransceiver("video", { direction: "recvonly" });
+    };
+
+    const processSignal = async (
+      connection: RTCPeerConnection,
+      signal: IncomingSignal
+    ) => {
+      if (sessionIdRef.current !== activeSession || signal.fromId !== peerId) {
+        return;
+      }
+
+      try {
+        if (signal.type === "offer") {
+          if (connection.signalingState === "have-local-offer" && !isInitiator) {
+            await connection.setLocalDescription({ type: "rollback" });
+          }
+          await connection.setRemoteDescription(
+            new RTCSessionDescription(signal.payload as RTCSessionDescriptionInit)
+          );
+          remoteDescriptionSet = true;
+          await flushCandidates(connection);
+          const answer = await connection.createAnswer();
+          await connection.setLocalDescription(answer);
+          onSignal({ type: "answer", payload: answer, targetId: peerId });
+        } else if (signal.type === "answer") {
+          if (connection.signalingState !== "have-local-offer") return;
+          await connection.setRemoteDescription(
+            new RTCSessionDescription(signal.payload as RTCSessionDescriptionInit)
+          );
+          remoteDescriptionSet = true;
+          await flushCandidates(connection);
+        } else if (signal.type === "ice-candidate") {
+          const candidate = signal.payload as RTCIceCandidateInit;
+          if (!remoteDescriptionSet || !connection.remoteDescription) {
+            pendingCandidates.push(candidate);
+            return;
+          }
+          await connection.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+      } catch (err) {
+        console.error("[WebRTC] Signal error:", err);
+      }
+    };
+
+    const handleSignal = async (signal: IncomingSignal) => {
+      if (!pc || !pcReady) {
+        earlySignals.push(signal);
+        return;
+      }
+      await processSignal(pc, signal);
+    };
+
     (async () => {
       const iceServers = await fetchIceServers();
       if (cancelled || sessionIdRef.current !== activeSession) return;
@@ -85,9 +156,7 @@ export function useWebRTC({
       pc = new RTCPeerConnection({ iceServers });
       pcRef.current = pc;
 
-      localStream.getTracks().forEach((track) => {
-        pc!.addTrack(track, localStream);
-      });
+      attachLocalMedia(pc);
 
       pc.ontrack = (event) => {
         if (sessionIdRef.current !== activeSession) return;
@@ -95,7 +164,15 @@ export function useWebRTC({
         if (stream) {
           setRemoteStream(stream);
         } else if (event.track) {
-          setRemoteStream(new MediaStream([event.track]));
+          setRemoteStream((prev) => {
+            const next = prev
+              ? new MediaStream(prev.getTracks())
+              : new MediaStream();
+            if (!next.getTracks().some((t) => t.id === event.track.id)) {
+              next.addTrack(event.track);
+            }
+            return next;
+          });
         }
       };
 
@@ -115,60 +192,20 @@ export function useWebRTC({
         setConnectionState(pc.connectionState);
       };
 
-      const handleSignal = async (signal: {
-        type: "offer" | "answer" | "ice-candidate";
-        payload: RTCSessionDescriptionInit | RTCIceCandidateInit;
-        fromId: string;
-      }) => {
-        if (!pc || sessionIdRef.current !== activeSession || signal.fromId !== peerId) {
-          return;
-        }
-
-        try {
-          if (signal.type === "offer") {
-            if (pc.signalingState !== "stable" && pc.signalingState !== "have-local-offer") {
-              // Ignore unexpected offers once negotiation advanced
-            }
-            // If we also created an offer (glare), the non-initiator path should win;
-            // server assigns a single initiator, so accept remote offer when we are not initiator.
-            if (pc.signalingState === "have-local-offer" && !isInitiator) {
-              await pc.setLocalDescription({ type: "rollback" });
-            }
-            await pc.setRemoteDescription(
-              new RTCSessionDescription(signal.payload as RTCSessionDescriptionInit)
-            );
-            remoteDescriptionSet = true;
-            await flushCandidates(pc);
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            onSignal({ type: "answer", payload: answer, targetId: peerId });
-          } else if (signal.type === "answer") {
-            if (pc.signalingState !== "have-local-offer") return;
-            await pc.setRemoteDescription(
-              new RTCSessionDescription(signal.payload as RTCSessionDescriptionInit)
-            );
-            remoteDescriptionSet = true;
-            await flushCandidates(pc);
-          } else if (signal.type === "ice-candidate") {
-            const candidate = signal.payload as RTCIceCandidateInit;
-            if (!remoteDescriptionSet || !pc.remoteDescription) {
-              pendingCandidates.push(candidate);
-              return;
-            }
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
-          }
-        } catch (err) {
-          console.error("[WebRTC] Signal error:", err);
-        }
-      };
-
       unsubscribe = onSignalReceived(handleSignal);
+      pcReady = true;
 
-      if (isInitiator) {
+      while (earlySignals.length > 0) {
+        const signal = earlySignals.shift();
+        if (signal) await processSignal(pc, signal);
+      }
+
+      if (cancelled || sessionIdRef.current !== activeSession) return;
+
+      if (isInitiator && pc.signalingState === "stable") {
         try {
-          if (sessionIdRef.current !== activeSession) return;
           const offer = await pc.createOffer();
-          if (sessionIdRef.current !== activeSession) return;
+          if (cancelled || sessionIdRef.current !== activeSession) return;
           await pc.setLocalDescription(offer);
           onSignal({ type: "offer", payload: offer, targetId: peerId });
         } catch (err) {
@@ -193,21 +230,27 @@ export function useWebRTC({
       setRemoteStream(null);
       setConnectionState("new");
     };
-    // Intentionally omit localStream from deps so device switches use replaceTrack
-    // instead of recreating the peer connection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [peerId, isInitiator, enabled, sessionId]);
+  }, [peerId, isInitiator, enabled, sessionId, hasLocalMedia]);
 
-  const replaceTrack = useCallback(async (kind: "audio" | "video", track: MediaStreamTrack) => {
-    const pc = pcRef.current;
-    if (!pc) return;
-    const sender = pc.getSenders().find((s) => s.track?.kind === kind);
-    if (sender) {
-      await sender.replaceTrack(track);
-      return;
-    }
-    pc.addTrack(track);
-  }, []);
+  const replaceTrack = useCallback(
+    async (kind: "audio" | "video", track: MediaStreamTrack) => {
+      const pc = pcRef.current;
+      if (!pc) return;
+      const sender = pc.getSenders().find((s) => s.track?.kind === kind);
+      if (sender) {
+        await sender.replaceTrack(track);
+        return;
+      }
+      const stream = localStreamRef.current;
+      if (stream) {
+        pc.addTrack(track, stream);
+      } else {
+        pc.addTrack(track);
+      }
+    },
+    []
+  );
 
   return { remoteStream, connectionState, cleanup, replaceTrack };
 }

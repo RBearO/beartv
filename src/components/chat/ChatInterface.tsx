@@ -117,14 +117,6 @@ export default function ChatInterface() {
     if (showChat) setUnreadCount(0);
   }, [showChat]);
 
-  const mapConnectionState = (): "connected" | "connecting" | "disconnected" | "searching" | "error" => {
-    if (!isSessionActive) return "disconnected";
-    if (isSearching && !peer) return "searching";
-    if (peer) return "connected";
-    if (isConnected) return "connecting";
-    return "disconnected";
-  };
-
   const matchmakingStatus: MatchmakingStatus = useMemo(() => {
     if (isWakingServer) return "waking";
     if (stoppingRef.current || isBusy) {
@@ -165,7 +157,12 @@ export default function ChatInterface() {
         session.user.id.localeCompare(peer.userId) < 0
     );
 
-  const { remoteStream, cleanup: cleanupWebRTC, replaceTrack } = useWebRTC({
+  const {
+    remoteStream,
+    connectionState: webrtcState,
+    cleanup: cleanupWebRTC,
+    replaceTrack,
+  } = useWebRTC({
     onSignal: sendSignal,
     onSignalReceived: onSignal,
     localStream: stream,
@@ -174,6 +171,25 @@ export default function ChatInterface() {
     enabled: isSessionActive,
     sessionId,
   });
+
+  const mapConnectionState = (): "connected" | "connecting" | "disconnected" | "searching" | "error" => {
+    if (!isSessionActive) return "disconnected";
+    if (isSearching && !peer) return "searching";
+    if (peer) {
+      if (webrtcState === "connected") return "connected";
+      if (
+        webrtcState === "failed" ||
+        webrtcState === "disconnected" ||
+        webrtcState === "closed"
+      ) {
+        return "error";
+      }
+      return "connecting";
+    }
+    if (isConnected) return "connecting";
+    return "disconnected";
+  };
+
 
   useEffect(() => {
     setOnTrackReplaced(async (kind, track) => {

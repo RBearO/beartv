@@ -139,6 +139,8 @@ No `vercel.json` is required for the current app.
 | `NEXT_PUBLIC_STUN_SERVERS` | `stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302` |
 | `TURN_URL` / `TURNS_URL` | Optional Coturn URLs |
 | `TURN_USERNAME` / `TURN_PASSWORD` | Server-only; served via `/api/ice` |
+| `METERED_DOMAIN` | e.g. `yourapp.metered.live` (Open Relay / Metered) |
+| `METERED_TURN_API_KEY` | Credential API key from Metered dashboard (server-only) |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Optional Cloudflare Turnstile |
 | `TURNSTILE_SECRET_KEY` | Server-only |
 | OAuth `AUTH_GOOGLE_*` / `AUTH_GITHUB_*` | Optional |
@@ -213,7 +215,16 @@ Rex should sign out and back in after a grant so the JWT refreshes (role is refr
 ## Configure STUN/TURN
 
 1. STUN (default public Google STUN) works for many same-network / easy-NAT cases.
-2. For cross-network reliability, run Coturn (e.g. on your NAS) and set:
+2. **Cross-network video usually needs TURN.** Prefer Metered Open Relay free tier (API key required — no secrets in git):
+
+```env
+METERED_DOMAIN=yourapp.metered.live
+METERED_TURN_API_KEY=REPLACE_WITH_DASHBOARD_KEY
+```
+
+   Sign up: https://www.metered.ca/tools/openrelay/ — free tier includes limited monthly relay bandwidth. Paid Metered or self-hosted Coturn is required for production-scale traffic.
+
+3. Or run Coturn (e.g. on your NAS) and set:
 
 ```env
 TURN_URL=turn:YOUR-TURN-HOST:3478
@@ -222,9 +233,9 @@ TURN_USERNAME=REPLACE_ME
 TURN_PASSWORD=REPLACE_ME
 ```
 
-3. Authenticated clients fetch ICE servers from `GET /api/ice` (TURN credentials stay server-side).
+4. Authenticated clients fetch ICE servers from `GET /api/ice` (TURN credentials stay server-side). Confirm `turnConfigured: true` in the JSON response while signed in.
 
-**Warning:** Without a working TURN server, some peer connections between different networks/mobile carriers will fail. Do not claim full WebRTC reliability until TURN is tested.
+**Warning:** Without a working TURN server, peers on different NATs/mobile carriers often get matchmaking "Connected" with black/silent video. That is expected with STUN-only.
 
 ---
 

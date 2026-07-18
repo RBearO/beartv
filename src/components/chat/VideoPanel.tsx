@@ -34,25 +34,25 @@ export default function VideoPanel({
   showSearchingAnimation = true,
 }: VideoPanelProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const hasVideo = !!stream?.getVideoTracks().some((t) => t.readyState === "live" && t.enabled);
+  const hasLiveVideo = !!stream
+    ?.getVideoTracks()
+    .some((t) => t.readyState === "live" && t.enabled);
+  const hasAnyTrack = !!stream && stream.getTracks().length > 0;
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    if (stream && hasVideo) {
+    if (stream && hasAnyTrack) {
       if (video.srcObject !== stream) {
         video.srcObject = stream;
       }
+      // Always play so remote audio works even when camera is off.
       void video.play().catch(() => {});
-    } else if (!hasVideo) {
-      if (stream && video.srcObject !== stream) {
-        video.srcObject = stream;
-      }
     } else {
       video.srcObject = null;
     }
-  }, [stream, hasVideo, streamRevision]);
+  }, [stream, hasAnyTrack, hasLiveVideo, streamRevision]);
 
   return (
     <div
@@ -62,18 +62,33 @@ export default function VideoPanel({
         sizeClassName
       )}
     >
-      {stream && stream.getVideoTracks().length > 0 ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isLocal}
-          className={cn(
-            "w-full h-full object-cover",
-            isLocal && "scale-x-[-1]",
-            !hasVideo && "opacity-50"
+      {hasAnyTrack ? (
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={isLocal}
+            className={cn(
+              "w-full h-full object-cover",
+              isLocal && "scale-x-[-1]",
+              !hasLiveVideo && "opacity-0"
+            )}
+          />
+          {!hasLiveVideo && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[var(--video-panel-background)]">
+              <Avatar
+                name={name}
+                src={image}
+                size="xl"
+                className="!bg-[#2a2a2a] !text-[var(--video-panel-text)] !border-[var(--accent)]"
+              />
+              <p className="text-sm video-panel-muted">
+                {stream?.getVideoTracks().length ? "Camera off" : label}
+              </p>
+            </div>
           )}
-        />
+        </>
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[var(--video-panel-background)]">
           {isSearching ? (
@@ -96,9 +111,7 @@ export default function VideoPanel({
                 size="xl"
                 className="!bg-[#2a2a2a] !text-[var(--video-panel-text)] !border-[var(--accent)]"
               />
-              <p className="text-sm video-panel-muted">
-                {stream && !hasVideo ? "Camera off" : label}
-              </p>
+              <p className="text-sm video-panel-muted">{label}</p>
             </>
           )}
         </div>

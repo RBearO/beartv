@@ -29,11 +29,21 @@ interface UseSocketOptions {
   interests?: string[];
 }
 
+type WebRTCIncomingSignal = {
+  type: "offer" | "answer" | "ice-candidate";
+  payload: RTCSessionDescriptionInit | RTCIceCandidateInit;
+  fromId: string;
+};
+
 export function useSocket(options: UseSocketOptions | null) {
   const socketRef = useRef<Socket | null>(null);
   const sessionActiveRef = useRef(false);
   const sessionIdRef = useRef(0);
   const skipInProgressRef = useRef(false);
+  const signalHandlerRef = useRef<((signal: WebRTCIncomingSignal) => void) | null>(
+    null
+  );
+  const pendingSignalsRef = useRef<WebRTCIncomingSignal[]>([]);
 
   const [isConnected, setIsConnected] = useState(false);
   const [isWakingServer, setIsWakingServer] = useState(false);
@@ -57,6 +67,7 @@ export function useSocket(options: UseSocketOptions | null) {
     setMessages([]);
     setIsPartnerTyping(false);
     setMatchEnded(null);
+    pendingSignalsRef.current = [];
   }, []);
 
   const beginSession = useCallback(() => {
@@ -118,10 +129,22 @@ export function useSocket(options: UseSocketOptions | null) {
       socket.on("match:found", (peerInfo: PeerInfo) => {
         if (!sessionActiveRef.current) return;
         skipInProgressRef.current = false;
+        pendingSignalsRef.current = [];
         setPeer(peerInfo);
         setMatchEnded(null);
         setMessages([]);
         setIsPartnerTyping(false);
+      });
+
+      // Always listen so offers/ICE aren't dropped before useWebRTC subscribes.
+      socket.on("webrtc:signal", (signal: WebRTCIncomingSignal) => {
+        if (!sessionActiveRef.current) return;
+        const handler = signalHandlerRef.current;
+        if (handler) {
+          handler(signal);
+          return;
+        }
+        pendingSignalsRef.current.push(signal);
       });
 
       socket.on("match:ended", (reason: string) => {
@@ -198,27 +221,19 @@ export function useSocket(options: UseSocketOptions | null) {
     []
   );
 
-  const onSignal = useCallback(
-    (handler: (signal: {
-      type: "offer" | "answer" | "ice-candidate";
-      payload: RTCSessionDescriptionInit | RTCIceCandidateInit;
-      fromId: string;
-    }) => void) => {
-      const wrapped = (signal: {
-        type: "offer" | "answer" | "ice-candidate";
-        payload: RTCSessionDescriptionInit | RTCIceCandidateInit;
-        fromId: string;
-      }) => {
-        if (!sessionActiveRef.current) return;
-        handler(signal);
-      };
-      socketRef.current?.on("webrtc:signal", wrapped);
-      return () => {
-        socketRef.current?.off("webrtc:signal", wrapped);
-      };
-    },
-    []
-  );
+  const onSignal = useCallback((handler: (signal: WebRTCIncomingSignal) => void) => {
+    signalHandlerRef.current = handler;
+    const pending = pendingSignalsRef.current;
+    pendingSignalsRef.current = [];
+    for (const signal of pending) {
+      handler(signal);
+    }
+    return () => {
+      if (signalHandlerRef.current === handler) {
+        signalHandlerRef.current = null;
+      }
+    };
+  }, []);
 
   const reportUser = useCallback(
     (reportedId: string, reason: string, description?: string) => {
