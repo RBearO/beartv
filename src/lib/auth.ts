@@ -5,6 +5,7 @@ import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 import bcrypt from "bcryptjs";
 import prisma from "./prisma";
+import { authConfig } from "./auth.config";
 
 function parseAdminEmails(): string[] {
   return (process.env.ADMIN_EMAILS || "")
@@ -19,12 +20,8 @@ export function isEmailInAdminAllowlist(email?: string | null): boolean {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
-  trustHost: true,
-  session: { strategy: "jwt" },
-  pages: {
-    signIn: "/login",
-  },
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
@@ -59,7 +56,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!isValid) return null;
 
-        // Bootstrap allowlisted admins into the DB role system
         if (isEmailInAdminAllowlist(user.email) && user.role !== "ADMIN") {
           await prisma.user.update({
             where: { id: user.id },
@@ -80,6 +76,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
+    ...authConfig.callbacks,
     async jwt({ token, user, trigger, session }) {
       if (trigger === "update" && session) {
         if (typeof session.mustChangePassword === "boolean") {
@@ -96,6 +93,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.mustChangePassword = Boolean(
           (user as { mustChangePassword?: boolean }).mustChangePassword
         );
+        (token as { roleCheckedAt?: number }).roleCheckedAt = Date.now();
       } else if (token.id) {
         const lastChecked =
           typeof (token as { roleCheckedAt?: number }).roleCheckedAt === "number"
@@ -128,18 +126,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return token;
     },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.mustChangePassword = Boolean(token.mustChangePassword);
-      }
-      return session;
-    },
   },
 });
 
-/** Primary check: database ADMIN/MODERATOR role. Allowlist bootstraps first admins. */
 export async function isAdmin(userIdOrEmail?: string | null): Promise<boolean> {
   if (!userIdOrEmail) return false;
 
@@ -171,7 +160,6 @@ export async function isModerator(userId: string): Promise<boolean> {
   return isEmailInAdminAllowlist(user.email);
 }
 
-/** Require authenticated moderator/admin for API routes */
 export async function requireModerator() {
   const session = await auth();
   if (!session?.user?.id || !(await isModerator(session.user.id))) {

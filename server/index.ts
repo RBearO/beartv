@@ -6,8 +6,14 @@ import { findBestMatch } from "./matchmaking";
 import type { QueueUser, MatchPreferences, ChatMessage } from "../src/types/index";
 
 if (process.env.NODE_ENV === "production") {
-  if (!process.env.REDIS_URL?.trim()) {
-    throw new Error("[BearTV Socket] REDIS_URL is required in production.");
+  const hasRedis = Boolean(process.env.REDIS_URL?.trim());
+  const allowMemory =
+    process.env.ALLOW_INMEMORY_REDIS === "true" ||
+    process.env.ALLOW_INMEMORY_REDIS === "1";
+  if (!hasRedis && !allowMemory) {
+    throw new Error(
+      "[BearTV Socket] REDIS_URL is required in production (or set ALLOW_INMEMORY_REDIS=true for single-instance free tier)."
+    );
   }
 }
 

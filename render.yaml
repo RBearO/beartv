@@ -18,17 +18,12 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: "3001"
-      - key: SOCKET_PORT
-        value: "3001"
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
+      # Render injects PORT — do not hardcode it
       - key: AUTH_URL
-        sync: false
+        value: https://beartv.vercel.app
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: https://beartv.vercel.app
       - key: ADMIN_EMAILS
-        sync: false
+        value: rexdancer@beartv.com
+      - key: ALLOW_INMEMORY_REDIS
+        value: "true"

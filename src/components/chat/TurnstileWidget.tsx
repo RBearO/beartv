@@ -27,13 +27,12 @@ export default function TurnstileWidget({ onVerify, onError }: TurnstileWidgetPr
 
   useEffect(() => {
     const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-    if (!siteKey || !containerRef.current) {
-      // Dev fallback: auto-verify when Turnstile is not configured
-      if (process.env.NODE_ENV === "development") {
-        onVerify("dev-token");
-      }
+    if (!siteKey) {
+      // Skip CAPTCHA when Turnstile is not configured (local + free deploys)
+      onVerify("dev-token");
       return;
     }
+    if (!containerRef.current) return;
 
     const renderWidget = () => {
       if (!containerRef.current || !window.turnstile) return;
