@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum BanType {
+  TEMPORARY
+  PERMANENT
+}
+
+enum MatchStatus {
+  CONNECTED
+  SKIPPED
+  DISCONNECTED
+  REPORTED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  password      String?
+  role                Role      @default(USER)
+  gender              Gender    @default(PREFER_NOT_TO_SAY)
+  country             String?
+  bio                 String?
+  mustChangePassword  Boolean   @default(false)
+  isOnline            Boolean   @default(false)
+  lastSeen            DateTime  @default(now())
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  settings      Settings?
+  interests     UserInterest[]
+  reportsMade   Report[]       @relation("ReporterReports")
+  reportsReceived Report[]     @relation("ReportedReports")
+  bans          Ban[]
+  bansIssued    Ban[]          @relation("BanIssuer")
+  matchHistory  MatchHistory[] @relation("UserMatches")
+  partnerMatches MatchHistory[] @relation("PartnerMatches")
+  moderationLogs ModerationLog[] @relation("ModeratorLogs")
+
+  @@index([email])
+  @@index([isOnline])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Settings {
+  id                String  @id @default(cuid())
+  userId            String  @unique
+  darkMode          Boolean @default(true)
+  countryFilter     String?
+  genderPreference  Gender?
+  enableNotifications Boolean @default(true)
+  autoConnect       Boolean @default(false)
+  showOnlineStatus  Boolean @default(true)
+  language          String  @default("en")
+  appearance        Json?
+  appearanceUpdatedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Interest {
+  id    String @id @default(cuid())
+  name  String @unique
+  slug  String @unique
+  users UserInterest[]
+}
+
+model UserInterest {
+  id         String @id @default(cuid())
+  userId     String
+  interestId String
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, interestId])
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  reporterId  String
+  reportedId  String
+  reason      String
+  description String?
+  status      ReportStatus @default(PENDING)
+  reviewedBy  String?
+  reviewNote  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  reporter User @relation("ReporterReports", fields: [reporterId], references: [id])
+  reported User @relation("ReportedReports", fields: [reportedId], references: [id])
+
+  @@index([status])
+  @@index([reportedId])
+}
+
+model Ban {
+  id        String   @id @default(cuid())
+  userId    String
+  type      BanType
+  reason    String
+  ipAddress String?
+  expiresAt DateTime?
+  issuedBy  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user   User  @relation(fields: [userId], references: [id])
+  issuer User? @relation("BanIssuer", fields: [issuedBy], references: [id])
+
+  @@index([userId, isActive])
+  @@index([ipAddress])
+}
+
+model MatchHistory {
+  id        String      @id @default(cuid())
+  userId    String
+  partnerId String
+  status    MatchStatus @default(CONNECTED)
+  duration  Int?
+  createdAt DateTime    @default(now())
+
+  user    User @relation("UserMatches", fields: [userId], references: [id])
+  partner User @relation("PartnerMatches", fields: [partnerId], references: [id])
+
+  @@index([userId])
+}
+
+model ModerationLog {
+  id          String   @id @default(cuid())
+  moderatorId String
+  action      String
+  targetId    String?
+  details     String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  moderator User @relation("ModeratorLogs", fields: [moderatorId], references: [id])
+
+  @@index([moderatorId])
+  @@index([createdAt])
+}

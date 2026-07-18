@@ -1,0 +1,34 @@
+# Free-tier blueprint:
+# - web: Vercel (Next.js)
+# - socket: Render Web Service (Socket.io + Redis)
+# Secrets must be set in the Render dashboard, not committed here.
+
+services:
+  - type: web
+    name: beartv-socket
+    runtime: node
+    plan: free
+    region: oregon
+    # Free web services sleep after inactivity; the frontend wakes via /health.
+    buildCommand: npm ci && npm run db:generate
+    startCommand: npm run start:socket
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: SOCKET_PORT
+        value: "3001"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: AUTH_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false

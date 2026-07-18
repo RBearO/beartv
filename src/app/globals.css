@@ -1,0 +1,570 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bear-brown: #8B5E3C;
+    --bear-gold: #F4C542;
+    --bear-dark: #0A0A0A;
+    --bear-gray: #1A1A1A;
+    --page-background: #111111;
+    --page-bg: var(--page-background);
+    --surface-background: #181818;
+    --surface-bg: var(--surface-background);
+    --card-bg: #222222;
+    --text-primary: #f7f7f7;
+    --text-secondary: #b8b8b8;
+    --text-muted: #8f8f8f;
+    --border-default: #353535;
+    --border-color: var(--border-default);
+    --video-panel-background: #1b1b1b;
+    --video-panel-text: #f7f7f7;
+    --video-panel-muted-text: #b8b8b8;
+    --video-panel-border: #3c3c3c;
+    --background: var(--page-background);
+    --surface: var(--surface-background);
+    --card: var(--card-bg);
+    --foreground: var(--text-primary);
+    --muted: var(--text-secondary);
+    --accent: #f4c542;
+    --accent-foreground: #17120a;
+    --accent-text: var(--accent-foreground);
+    --danger: #dc2626;
+    --danger-text: #ffffff;
+    --radius: 16px;
+    --font-scale: 1;
+    --app-font: var(--font-default), ui-sans-serif, system-ui, sans-serif;
+    --font-family: var(--app-font);
+    --density-scale: 1;
+    --page-padding: 24px;
+    --card-padding: 20px;
+    --control-gap: 12px;
+    --control-height: 44px;
+    --nav-height: 64px;
+    --nav-padding-y: 0px;
+    --section-gap: 24px;
+    --chat-message-gap: 12px;
+    --animation-duration-fast: 150ms;
+    --animation-duration-normal: 250ms;
+    --animation-distance: 8px;
+    --local-video-width: 220px;
+    --local-video-height: 220px;
+    color-scheme: dark;
+  }
+
+  html[data-theme="light"] {
+    --page-background: #f7f5ef;
+    --page-bg: var(--page-background);
+    --surface-background: #ffffff;
+    --surface-bg: var(--surface-background);
+    --card-bg: #ffffff;
+    --text-primary: #171717;
+    --text-secondary: #454545;
+    --text-muted: #666666;
+    --border-default: #c9c9c9;
+    --border-color: var(--border-default);
+    /* Video stage stays dark in every theme */
+    --video-panel-background: #1b1b1b;
+    --video-panel-text: #f7f7f7;
+    --video-panel-muted-text: #b8b8b8;
+    --video-panel-border: #444444;
+    --background: var(--page-background);
+    --surface: var(--surface-background);
+    --card: var(--card-bg);
+    --foreground: var(--text-primary);
+    --muted: var(--text-secondary);
+    --accent-foreground: #17120a;
+    color-scheme: light;
+  }
+
+  html[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  html[data-density="compact"] {
+    --density-scale: 0.85;
+    --page-padding: 16px;
+    --card-padding: 12px;
+    --control-gap: 6px;
+    --control-height: 36px;
+    --nav-height: 52px;
+    --section-gap: 14px;
+    --chat-message-gap: 6px;
+  }
+
+  html[data-density="comfortable"] {
+    --density-scale: 1;
+    --page-padding: 24px;
+    --card-padding: 20px;
+    --control-gap: 12px;
+    --control-height: 44px;
+    --nav-height: 64px;
+    --section-gap: 24px;
+    --chat-message-gap: 12px;
+  }
+
+  html[data-density="spacious"] {
+    --density-scale: 1.15;
+    --page-padding: 32px;
+    --card-padding: 28px;
+    --control-gap: 18px;
+    --control-height: 52px;
+    --nav-height: 72px;
+    --section-gap: 32px;
+    --chat-message-gap: 16px;
+  }
+
+  :root,
+  html[data-font-style="default"] {
+    --app-font: var(--font-default), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  html[data-font-style="modern"] {
+    --app-font: var(--font-modern), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  html[data-font-style="friendly"] {
+    --app-font: var(--font-friendly), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  html[data-font-style="clean"] {
+    --app-font: Arial, Helvetica, ui-sans-serif, sans-serif;
+  }
+
+  html[data-font-style="system"] {
+    --app-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  html[data-local-video-size="small"] {
+    --local-video-width: 140px;
+    --local-video-height: 140px;
+  }
+  html[data-local-video-size="medium"] {
+    --local-video-width: 220px;
+    --local-video-height: 220px;
+  }
+  html[data-local-video-size="large"] {
+    --local-video-width: 300px;
+    --local-video-height: 300px;
+  }
+
+  @media (max-width: 640px) {
+    html[data-local-video-size="small"] {
+      --local-video-width: 110px;
+      --local-video-height: 110px;
+    }
+    html[data-local-video-size="medium"] {
+      --local-video-width: 150px;
+      --local-video-height: 150px;
+    }
+    html[data-local-video-size="large"] {
+      --local-video-width: 190px;
+      --local-video-height: 190px;
+    }
+  }
+
+  html {
+    font-size: calc(16px * var(--font-scale));
+  }
+
+  html,
+  body {
+    background: var(--page-background);
+    color: var(--text-primary);
+    font-family: var(--app-font);
+  }
+
+  body {
+    @apply antialiased;
+  }
+
+  button,
+  input,
+  select,
+  textarea,
+  optgroup {
+    font: inherit;
+    font-family: inherit;
+  }
+
+  input,
+  textarea,
+  select {
+    color: var(--text-primary);
+    background: var(--surface-background);
+    border-color: var(--border-default);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--text-muted);
+  }
+
+  html[data-background-style="gradient"] body {
+    background:
+      radial-gradient(ellipse at top, color-mix(in srgb, var(--accent) 18%, transparent), transparent 55%),
+      var(--page-bg);
+  }
+
+  html[data-background-style="glow"] body {
+    background:
+      radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 40%),
+      radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 35%),
+      var(--page-bg);
+  }
+
+  html[data-background-style="minimal"] body {
+    background: var(--page-bg);
+  }
+
+  html[data-background-style="glass"] body {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-bg) 80%, transparent),
+      var(--page-bg)
+    );
+  }
+
+  html[data-animations="none"] .motion-safe,
+  html[data-animations="none"] [data-decorative-motion] {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  html[data-animations="none"] *:not(video):not(canvas):not(.matchmaking-spinner):not(.matchmaking-loader):not(.beartv-spinner) {
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
+  }
+
+  html[data-animations="reduced"] *:not(video):not(canvas):not(.matchmaking-spinner):not(.matchmaking-loader):not(.beartv-spinner) {
+    animation-duration: var(--animation-duration-normal) !important;
+    transition-duration: var(--animation-duration-fast) !important;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 999px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (forced-colors: active) {
+    :root,
+    html[data-theme="dark"],
+    html[data-theme="light"] {
+      --page-background: Canvas;
+      --page-bg: Canvas;
+      --surface-background: Canvas;
+      --surface-bg: Canvas;
+      --card-bg: Canvas;
+      --text-primary: CanvasText;
+      --text-secondary: CanvasText;
+      --text-muted: CanvasText;
+      --border-default: CanvasText;
+      --border-color: CanvasText;
+      --video-panel-background: Canvas;
+      --video-panel-text: CanvasText;
+      --video-panel-muted-text: CanvasText;
+      --video-panel-border: CanvasText;
+      --background: Canvas;
+      --surface: Canvas;
+      --card: Canvas;
+      --foreground: CanvasText;
+      --muted: CanvasText;
+      --accent: Highlight;
+      --accent-foreground: HighlightText;
+      --accent-text: HighlightText;
+      --danger: LinkText;
+      --danger-text: Canvas;
+      --bear-gold: Highlight;
+      --bear-brown: ButtonText;
+      --bear-gray: Canvas;
+      --bear-dark: Canvas;
+    }
+
+    body {
+      background: Canvas;
+      color: CanvasText;
+    }
+
+    button,
+    input,
+    textarea,
+    select,
+    [role="button"],
+    [role="dialog"],
+    [role="menu"],
+    [role="status"] {
+      border: 1px solid ButtonText;
+      forced-color-adjust: auto;
+    }
+
+    a {
+      color: LinkText;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    [role="button"]:focus-visible {
+      outline: 2px solid Highlight;
+      outline-offset: 2px;
+    }
+
+    video {
+      border: 1px solid CanvasText;
+    }
+
+    .glass,
+    .app-card,
+    header {
+      background: Canvas !important;
+      border-color: CanvasText !important;
+      backdrop-filter: none !important;
+    }
+
+    .text-gradient {
+      background: none !important;
+      -webkit-background-clip: unset !important;
+      background-clip: unset !important;
+      color: CanvasText !important;
+      -webkit-text-fill-color: CanvasText !important;
+    }
+  }
+}
+
+@layer components {
+  .font-app {
+    font-family: var(--app-font);
+  }
+
+  .app-header {
+    height: var(--nav-height);
+  }
+
+  .app-page {
+    padding-left: var(--page-padding);
+    padding-right: var(--page-padding);
+  }
+
+  .app-card {
+    padding: var(--card-padding);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+  }
+
+  .app-controls {
+    gap: var(--control-gap);
+  }
+
+  .app-control-btn {
+    min-height: var(--control-height);
+  }
+
+  .app-section-gap {
+    gap: var(--section-gap);
+  }
+
+  .chat-messages {
+    gap: var(--chat-message-gap);
+  }
+
+  .local-video-shell {
+    width: var(--local-video-width);
+    max-width: min(var(--local-video-width), calc(100vw - 2rem));
+  }
+
+  .text-primary,
+  .app-heading,
+  .navigation-label,
+  .settings-label,
+  .profile-label {
+    color: var(--text-primary);
+  }
+
+  .text-secondary,
+  .secondary-text {
+    color: var(--text-secondary);
+  }
+
+  .text-muted,
+  .muted-text {
+    color: var(--text-muted);
+  }
+
+  .border-token {
+    border-color: var(--border-default);
+  }
+
+  .video-panel,
+  .local-video-panel,
+  .remote-video-panel {
+    background-color: var(--video-panel-background);
+    color: var(--video-panel-text);
+    border: 1px solid var(--video-panel-border);
+  }
+
+  .video-panel-label {
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid var(--video-panel-border);
+    color: var(--video-panel-text);
+  }
+
+  .video-panel-muted {
+    color: var(--video-panel-muted-text);
+  }
+
+  .main-header-inner {
+    display: grid;
+    /* Left/right size to content so status badges are never clipped */
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 1.25rem;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    overflow: visible;
+  }
+
+  .header-presence-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .header-presence-section > * {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .header-navigation {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: clamp(0.75rem, 1.5vw, 1.5rem);
+    min-width: 0;
+    white-space: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .header-navigation::-webkit-scrollbar {
+    display: none;
+  }
+
+  .header-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .matchmaking-status-text,
+  .matchmaking-loader-text {
+    opacity: 1 !important;
+    animation: none !important;
+    color: var(--video-panel-muted-text);
+  }
+}
+
+/* Spinner styles live outside @layer so animation is not overridden by utilities */
+@keyframes beartv-search-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.matchmaking-spinner,
+.matchmaking-loader,
+.beartv-spinner {
+  box-sizing: border-box;
+  display: block;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 3px solid #454545;
+  border-top-color: var(--accent, #f4c542);
+  opacity: 1;
+  animation-name: beartv-search-rotate;
+  animation-duration: 1.25s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-delay: 0s;
+  animation-fill-mode: none;
+  will-change: transform;
+  forced-color-adjust: auto;
+}
+
+html[data-animations="reduced"] .matchmaking-spinner,
+html[data-animations="reduced"] .matchmaking-loader,
+html[data-animations="reduced"] .beartv-spinner {
+  animation-name: beartv-search-rotate;
+  animation-duration: 2.5s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+html[data-animations="none"] .matchmaking-spinner,
+html[data-animations="none"] .matchmaking-loader,
+html[data-animations="none"] .beartv-spinner,
+.matchmaking-loader--static {
+  animation: none !important;
+  will-change: auto;
+  border-top-color: var(--accent, #f4c542);
+  border-right-color: var(--accent, #f4c542);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-animation-preference="system"] .matchmaking-spinner,
+  html[data-animation-preference="system"] .matchmaking-loader,
+  html[data-animation-preference="system"] .beartv-spinner {
+    animation-duration: 2.5s;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: color-mix(in srgb, var(--surface-bg) 88%, transparent);
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(16px);
+    border-radius: var(--radius);
+  }
+
+  .text-gradient {
+    @apply text-transparent bg-clip-text;
+    background-image: linear-gradient(90deg, var(--bear-brown), var(--accent));
+  }
+
+  .rounded-token {
+    border-radius: var(--radius);
+  }
+
+  .transition-token {
+    transition-duration: var(--animation-duration-normal);
+  }
+}

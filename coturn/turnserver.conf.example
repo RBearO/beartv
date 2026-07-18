@@ -1,0 +1,17 @@
+# Example Coturn config for NAS TURN (optional).
+# Copy to turnserver.conf and fill real values. Do not commit secrets.
+# Enable with: docker compose -f docker-compose.production.yml --profile turn up -d
+
+listening-port=3478
+tls-listening-port=5349
+fingerprint
+lt-cred-mech
+user=REPLACE_TURN_USER:REPLACE_TURN_PASSWORD
+realm=beartv.local
+# Prefer restricting relay addresses to your public IP / interface
+# external-ip=YOUR.PUBLIC.IP
+no-multicast-peers
+no-cli
+# Keep logging free of media payloads
+log-file=stdout
+simple-log
