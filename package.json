@@ -12,7 +12,7 @@
     "build": "next build",
     "start": "concurrently \"next start\" \"tsx server/index.ts\"",
     "start:web": "next start",
-    "start:socket": "tsx server/index.ts",
+    "start:socket": "node ./node_modules/tsx/dist/cli.mjs server/index.ts",
     "lint": "next lint",
     "test": "tsx --test src/lib/interests.test.ts src/lib/appearance.test.ts",
     "typecheck": "tsc --noEmit",
@@ -40,6 +40,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "tailwind-merge": "^2.6.0",
+    "tsx": "^4.19.2",
     "uuid": "^11.0.3",
     "zod": "^3.24.1"
   },
@@ -55,7 +56,6 @@
     "postcss": "^8.4.49",
     "prisma": "^6.1.0",
     "tailwindcss": "^3.4.17",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },
   "prisma": {

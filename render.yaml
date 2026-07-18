@@ -10,7 +10,7 @@ services:
     plan: free
     region: oregon
     # Free web services sleep after inactivity; the frontend wakes via /health.
-    buildCommand: npm ci && npm run db:generate
+    buildCommand: npm ci --include=dev && npm run db:generate
     startCommand: npm run start:socket
     healthCheckPath: /health
     envVars:
