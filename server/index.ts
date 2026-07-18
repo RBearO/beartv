@@ -200,11 +200,15 @@ async function tryMatch(socket: Socket, data: SocketData, prefs?: MatchPreferenc
   data.partnerId = match.userId;
   data.partnerSocketId = match.socketId;
 
+  // Exactly one peer must create the offer (stable by userId)
+  const finderIsInitiator = data.userId < match.userId;
+
   socket.emit("match:found", {
     userId: match.userId,
     name: match.name,
     image: match.image,
     country: match.country,
+    isInitiator: finderIsInitiator,
   });
 
   const partnerSocket = io.sockets.sockets.get(match.socketId);
@@ -213,6 +217,7 @@ async function tryMatch(socket: Socket, data: SocketData, prefs?: MatchPreferenc
     name: data.name,
     image: data.image,
     country: data.country,
+    isInitiator: !finderIsInitiator,
   });
 }
 

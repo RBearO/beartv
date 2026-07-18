@@ -36,6 +36,8 @@ export interface PeerInfo {
   name?: string;
   image?: string;
   country?: string;
+  /** True when this client should create the WebRTC offer */
+  isInitiator?: boolean;
 }
 
 export interface WebRTCSignal {

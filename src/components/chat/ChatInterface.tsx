@@ -157,12 +157,20 @@ export default function ChatInterface() {
     return () => resetPresence();
   }, [resetPresence]);
 
+  const isInitiator =
+    peer?.isInitiator ??
+    Boolean(
+      session?.user?.id &&
+        peer?.userId &&
+        session.user.id.localeCompare(peer.userId) < 0
+    );
+
   const { remoteStream, cleanup: cleanupWebRTC, replaceTrack } = useWebRTC({
     onSignal: sendSignal,
     onSignalReceived: onSignal,
     localStream: stream,
     peerId: peer?.userId || null,
-    isInitiator: true,
+    isInitiator,
     enabled: isSessionActive,
     sessionId,
   });

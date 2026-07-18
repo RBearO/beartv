@@ -35,7 +35,8 @@ export function useWebRTC({
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const sessionIdRef = useRef(sessionId);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>("new");
+  const [connectionState, setConnectionState] =
+    useState<RTCPeerConnectionState>("new");
 
   sessionIdRef.current = sessionId;
 
@@ -62,6 +63,20 @@ export function useWebRTC({
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
     let pc: RTCPeerConnection | null = null;
+    const pendingCandidates: RTCIceCandidateInit[] = [];
+    let remoteDescriptionSet = false;
+
+    const flushCandidates = async (connection: RTCPeerConnection) => {
+      while (pendingCandidates.length > 0) {
+        const candidate = pendingCandidates.shift();
+        if (!candidate) continue;
+        try {
+          await connection.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error("[WebRTC] Delayed ICE error:", err);
+        }
+      }
+    };
 
     (async () => {
       const iceServers = await fetchIceServers();
@@ -77,7 +92,11 @@ export function useWebRTC({
       pc.ontrack = (event) => {
         if (sessionIdRef.current !== activeSession) return;
         const [stream] = event.streams;
-        if (stream) setRemoteStream(stream);
+        if (stream) {
+          setRemoteStream(stream);
+        } else if (event.track) {
+          setRemoteStream(new MediaStream([event.track]));
+        }
       };
 
       pc.onicecandidate = (event) => {
@@ -101,24 +120,42 @@ export function useWebRTC({
         payload: RTCSessionDescriptionInit | RTCIceCandidateInit;
         fromId: string;
       }) => {
-        if (!pc || sessionIdRef.current !== activeSession || signal.fromId !== peerId) return;
+        if (!pc || sessionIdRef.current !== activeSession || signal.fromId !== peerId) {
+          return;
+        }
 
         try {
           if (signal.type === "offer") {
+            if (pc.signalingState !== "stable" && pc.signalingState !== "have-local-offer") {
+              // Ignore unexpected offers once negotiation advanced
+            }
+            // If we also created an offer (glare), the non-initiator path should win;
+            // server assigns a single initiator, so accept remote offer when we are not initiator.
+            if (pc.signalingState === "have-local-offer" && !isInitiator) {
+              await pc.setLocalDescription({ type: "rollback" });
+            }
             await pc.setRemoteDescription(
               new RTCSessionDescription(signal.payload as RTCSessionDescriptionInit)
             );
+            remoteDescriptionSet = true;
+            await flushCandidates(pc);
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             onSignal({ type: "answer", payload: answer, targetId: peerId });
           } else if (signal.type === "answer") {
+            if (pc.signalingState !== "have-local-offer") return;
             await pc.setRemoteDescription(
               new RTCSessionDescription(signal.payload as RTCSessionDescriptionInit)
             );
+            remoteDescriptionSet = true;
+            await flushCandidates(pc);
           } else if (signal.type === "ice-candidate") {
-            await pc.addIceCandidate(
-              new RTCIceCandidate(signal.payload as RTCIceCandidateInit)
-            );
+            const candidate = signal.payload as RTCIceCandidateInit;
+            if (!remoteDescriptionSet || !pc.remoteDescription) {
+              pendingCandidates.push(candidate);
+              return;
+            }
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
           }
         } catch (err) {
           console.error("[WebRTC] Signal error:", err);
